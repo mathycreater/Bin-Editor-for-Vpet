@@ -174,6 +174,14 @@
         <option value="be">Big-Endian (MSB first)</option>
       </select>
     </div>
+    <div class="config-group">
+      <label>Char Format</label>
+      <select id="char-format">
+        <option value="quotes">Quoted ("0101", "1010")</option>
+        <option value="commas">Plain (0101, 1010)</option>
+        <option value="full">Full Sequence (01011010...)</option>
+      </select>
+    </div>
   </div>
 
   <div class="controls">
@@ -314,7 +322,19 @@ function drawPixel(e) {
 }
 
 function exportData() {
-  document.getElementById("output").value = grid.map(r => `"${r.join("")}"`).join(",\n");
+  const format = document.getElementById("char-format").value;
+  const rawRows = grid.map(r => r.join(""));
+  
+  let result = "";
+  if (format === 'quotes') {
+    result = rawRows.map(r => `"${r}"`).join(",\n");
+  } else if (format === 'commas') {
+    result = rawRows.join(", ");
+  } else {
+    result = rawRows.join("");
+  }
+  
+  document.getElementById("output").value = result;
 }
 
 function processBytes(mode) {
@@ -462,12 +482,25 @@ function exportBMP() {
 function importData() {
   saveState();
   let text = document.getElementById("output").value;
-  let lines = text.match(/"([01]+)"/g);
-  if (!lines) return alert("Invalid format (use quoted strings with 0s and 1s)");
-  lines = lines.map(l => l.replace(/"/g, ""));
-  for (let y = 0; y < Math.min(rows, lines.length); y++)
-    for (let x = 0; x < Math.min(cols, lines[y].length); x++)
-      grid[y][x] = Number(lines[y][x]);
+  
+  // Find all sequences of 0s and 1s that are at least 1 bit long
+  let sequences = text.match(/[01]+/g);
+  if (!sequences) return alert("Invalid format (no 0s and 1s found)");
+
+  // If it's one single long sequence, we split it into rows of 'cols' length
+  if (sequences.length === 1 && sequences[0].length > cols) {
+    let full = sequences[0];
+    sequences = [];
+    for (let i = 0; i < full.length; i += cols) {
+      sequences.push(full.substring(i, i + cols));
+    }
+  }
+
+  for (let y = 0; y < Math.min(rows, sequences.length); y++) {
+    for (let x = 0; x < Math.min(cols, sequences[y].length); x++) {
+      grid[y][x] = Number(sequences[y][x]);
+    }
+  }
   draw();
 }
 
