@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<title>32x16 Binary Editor</title>
+<style>
+  body {
+    background: #111;
+    color: white;
+    font-family: Arial;
+    text-align: center;
+  }
+  canvas {
+    border: 2px solid white;
+    image-rendering: pixelated;
+    cursor: crosshair;
+  }
+  textarea {
+    width: 90%;
+    height: 150px;
+    margin-top: 10px;
+    background: #000;
+    color: #0f0;
+    font-family: monospace;
+  }
+  button {
+    margin: 5px;
+    padding: 10px;
+  }
+</style>
+</head>
+<body>
+
+<h2>(32x16) Binary Editor for VPET (By Mathycreater)</h2>
+
+<canvas id="canvas"></canvas><br>
+
+<button onclick="setTool(1)">Lápis</button>
+<button onclick="setTool(0)">Borracha</button>
+<button onclick="toggleMirror()">Mirror: OFF</button>
+<button onclick="undo()">Undo</button>
+<button onclick="redo()">Redo</button>
+<button onclick="invertGrid()">Inverter</button>
+<button onclick="exportData()">Exportar</button>
+<button onclick="importData()">Importar</button>
+<button onclick="clearGrid()">Limpar</button>
+
+<br>
+
+<textarea id="output"></textarea>
+
+<script>
+const cols = 32;
+const rows = 16;
+const pixelSize = 15;
+
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+
+canvas.width = cols * pixelSize;
+canvas.height = rows * pixelSize;
+
+let grid = createEmptyGrid();
+let tool = 1;
+let mirror = false;
+
+let history = [];
+let redoStack = [];
+
+function createEmptyGrid() {
+  return Array.from({ length: rows }, () => Array(cols).fill(0));
+}
+
+function saveState() {
+  history.push(JSON.stringify(grid));
+  if (history.length > 100) history.shift();
+  redoStack = [];
+}
+
+function undo() {
+  if (history.length === 0) return;
+  redoStack.push(JSON.stringify(grid));
+  grid = JSON.parse(history.pop());
+  draw();
+}
+
+function redo() {
+  if (redoStack.length === 0) return;
+  history.push(JSON.stringify(grid));
+  grid = JSON.parse(redoStack.pop());
+  draw();
+}
+
+function invertGrid() {
+  saveState();
+  for (let y = 0; y < rows; y++) {
+    for (let x = 0; x < cols; x++) {
+      grid[y][x] = grid[y][x] === 1 ? 0 : 1;
+    }
+  }
+  draw();
+}
+
+function setTool(t) {
+  tool = t;
+}
+
+function toggleMirror() {
+  mirror = !mirror;
+  document.querySelectorAll("button")[2].innerText = `Mirror: ${mirror ? "ON" : "OFF"}`;
+}
+
+function draw() {
+  ctx.fillStyle = "#000";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  for (let y = 0; y < rows; y++) {
+    for (let x = 0; x < cols; x++) {
+      ctx.fillStyle = grid[y][x] ? "#fff" : "#000";
+      ctx.fillRect(x * pixelSize, y * pixelSize, pixelSize, pixelSize);
+
+      ctx.strokeStyle = "#333";
+      ctx.strokeRect(x * pixelSize, y * pixelSize, pixelSize, pixelSize);
+    }
+  }
+}
+
+canvas.addEventListener("mousedown", startDraw);
+canvas.addEventListener("mousemove", e => {
+  if (e.buttons === 1) drawPixel(e);
+});
+
+function startDraw(e) {
+  saveState();
+  drawPixel(e);
+}
+
+function drawPixel(e) {
+  const rect = canvas.getBoundingClientRect();
+  const x = Math.floor((e.clientX - rect.left) / pixelSize);
+  const y = Math.floor((e.clientY - rect.top) / pixelSize);
+
+  if (x >= 0 && x < cols && y >= 0 && y < rows) {
+    grid[y][x] = tool;
+
+    if (mirror) {
+      const mx = cols - 1 - x;
+      grid[y][mx] = tool;
+    }
+
+    draw();
+  }
+}
+
+function exportData() {
+  let result = grid.map(row => `"${row.join("")}"`).join(",\n");
+  document.getElementById("output").value = result;
+}
+
+function importData() {
+  saveState();
+
+  let text = document.getElementById("output").value;
+  let lines = text.match(/"([01]+)"/g);
+
+  if (!lines) return alert("Formato inválido");
+
+  lines = lines.map(l => l.replace(/"/g, ""));
+
+  if (lines.length !== rows) {
+    alert("Quantidade de linhas incorreta");
+    return;
+  }
+
+  for (let y = 0; y < rows; y++) {
+    if (lines[y].length !== cols) {
+      alert(`Linha ${y} com tamanho errado`);
+      return;
+    }
+    for (let x = 0; x < cols; x++) {
+      grid[y][x] = Number(lines[y][x]);
+    }
+  }
+
+  draw();
+}
+
+function clearGrid() {
+  saveState();
+  grid = createEmptyGrid();
+  draw();
+}
+
+function invertTextarea() {
+  let text = document.getElementById("output").value;
+  if (!text) return;
+  text = text.replace(/[01]/g, b => (b === "0" ? "1" : "0"));
+  document.getElementById("output").value = text;
+}
+
+</script>
+
+</body>
+</html>
