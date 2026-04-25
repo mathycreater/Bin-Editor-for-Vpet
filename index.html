@@ -4,50 +4,191 @@
 <meta charset="UTF-8">
 <title>32x16 Binary Editor</title>
 <style>
-  body {
-    background: #111;
-    color: white;
-    font-family: Arial;
-    text-align: center;
+  :root {
+    --bg-color: #0f111a;
+    --card-bg: #1a1d2e;
+    --accent-color: #00f2ff;
+    --text-color: #e6edf3;
+    --button-bg: #2d334a;
+    --button-hover: #3d4465;
+    --input-bg: #0d1117;
   }
-  canvas {
-    border: 2px solid white;
-    image-rendering: pixelated;
-    cursor: crosshair;
+
+  body { 
+    background: var(--bg-color); 
+    color: var(--text-color); 
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+    margin: 0;
   }
-  textarea {
-    width: 90%;
-    height: 150px;
-    margin-top: 10px;
+
+  .container {
+    background: var(--card-bg);
+    padding: 30px;
+    border-radius: 16px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    max-width: 900px;
+    width: 100%;
+  }
+
+  h2 { margin-top: 0; color: var(--accent-color); font-weight: 300; letter-spacing: 2px; text-align: center; }
+
+  .canvas-container {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    margin: 0 auto 20px auto;
+    border: 2px solid #333;
+    border-radius: 4px;
+    overflow: hidden;
+    width: fit-content;
+  }
+
+  canvas { 
+    display: block;
+    image-rendering: pixelated; 
+    cursor: crosshair; 
     background: #000;
-    color: #0f0;
-    font-family: monospace;
   }
-  button {
-    margin: 5px;
+
+  .status-bar {
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(4px);
+    color: var(--accent-color);
+    font-family: monospace;
+    font-size: 12px;
+    padding: 6px 10px;
+    display: flex;
+    justify-content: space-between;
+    border-top: 1px solid #333;
+  }
+
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+
+  .config-panel {
+    background: var(--input-bg);
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    justify-content: center;
+    border: 1px solid #333;
+  }
+
+  .config-group {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 5px;
+  }
+
+  .config-group label {
+    font-size: 11px;
+    color: #8b949e;
+    text-transform: uppercase;
+    font-weight: bold;
+  }
+
+  select, button {
+    background: var(--button-bg);
+    color: white;
+    border: 1px solid #444;
+    padding: 8px 15px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.2s;
+  }
+
+  button:hover { background: var(--button-hover); border-color: var(--accent-color); }
+  button.active { background: var(--accent-color); color: black; border-color: var(--accent-color); }
+
+  textarea { 
+    width: 100%; 
+    height: 120px; 
+    background: var(--input-bg); 
+    color: #58a6ff; 
+    font-family: 'Cascadia Code', 'Fira Code', monospace; 
+    border: 1px solid #333;
+    border-radius: 8px;
     padding: 10px;
+    box-sizing: border-box;
+    resize: vertical;
   }
 </style>
 </head>
 <body>
 
-<h2>(32x16) Binary Editor for VPET (By Mathycreater)</h2>
+<div class="container">
+  <h2>BIN EDITOR 32x16</h2>
 
-<canvas id="canvas"></canvas><br>
+  <div class="canvas-container">
+    <canvas id="canvas"></canvas>
+    <div class="status-bar">
+      <span id="coords">X: 0 | Y: 0</span>
+      <span id="mirror-status">Mirror: OFF</span>
+    </div>
+  </div>
 
-<button onclick="setTool(1)">Pencil</button>
-<button onclick="setTool(0)">Eraser</button>
-<button onclick="toggleMirror()">Mirror: OFF</button>
-<button onclick="undo()">Undo</button>
-<button onclick="redo()">Redo</button>
-<button onclick="invertGrid()">Invert</button>
-<button onclick="exportData()">Export</button>
-<button onclick="importData()">Import</button>
-<button onclick="clearGrid()">Clean All</button>
+  <div class="controls">
+    <button onclick="setTool(1)" id="btn-pencil" class="active">Pencil</button>
+    <button onclick="setTool(0)" id="btn-eraser">Eraser</button>
+    <button onclick="toggleMirror()" id="mirrorBtn">Mirror: OFF</button>
+    <button onclick="undo()">Undo</button>
+    <button onclick="redo()">Redo</button>
+    <button onclick="invertGrid()">Invert</button>
+    <button onclick="clearGrid()">Clear</button>
+  </div>
 
-<br>
+  <div class="config-panel">
+    <div class="config-group">
+      <label>Scanning</label>
+      <select id="scan-mode">
+        <option value="col">Column-major</option>
+        <option value="row">Row-major</option>
+      </select>
+    </div>
+    <div class="config-group">
+      <label>Byte Direction</label>
+      <select id="byte-dir">
+        <option value="vert">Vertical (1x8)</option>
+        <option value="horz">Horizontal (8x1)</option>
+      </select>
+    </div>
+    <div class="config-group">
+      <label>Endianness</label>
+      <select id="endian">
+        <option value="le">Little-Endian (LSB first)</option>
+        <option value="be">Big-Endian (MSB first)</option>
+      </select>
+    </div>
+  </div>
 
-<textarea id="output"></textarea>
+  <div class="controls">
+    <button onclick="processBytes('export')" style="background: #238636;">Export Bytes</button>
+    <button onclick="processBytes('import')" style="background: #1f6feb;">Import Bytes</button>
+    <button onclick="exportBMP()" style="background: #8957e5;">Download BMP</button>
+  </div>
+
+  <div class="controls">
+    <button onclick="exportData()">Export (char)</button>
+    <button onclick="importData()">Import (char)</button>
+  </div>
+
+  <textarea id="output" placeholder="Data output/input here..."></textarea>
+</div>
 
 <script>
 const cols = 32;
@@ -63,7 +204,6 @@ canvas.height = rows * pixelSize;
 let grid = createEmptyGrid();
 let tool = 1;
 let mirror = false;
-
 let history = [];
 let redoStack = [];
 
@@ -78,14 +218,14 @@ function saveState() {
 }
 
 function undo() {
-  if (history.length === 0) return;
+  if (!history.length) return;
   redoStack.push(JSON.stringify(grid));
   grid = JSON.parse(history.pop());
   draw();
 }
 
 function redo() {
-  if (redoStack.length === 0) return;
+  if (!redoStack.length) return;
   history.push(JSON.stringify(grid));
   grid = JSON.parse(redoStack.pop());
   draw();
@@ -93,21 +233,22 @@ function redo() {
 
 function invertGrid() {
   saveState();
-  for (let y = 0; y < rows; y++) {
-    for (let x = 0; x < cols; x++) {
-      grid[y][x] = grid[y][x] === 1 ? 0 : 1;
-    }
-  }
+  for (let y = 0; y < rows; y++)
+    for (let x = 0; x < cols; x++)
+      grid[y][x] ^= 1;
   draw();
 }
 
-function setTool(t) {
-  tool = t;
+function setTool(t) { 
+  tool = t; 
+  document.getElementById("btn-pencil").classList.toggle("active", tool === 1);
+  document.getElementById("btn-eraser").classList.toggle("active", tool === 0);
 }
 
 function toggleMirror() {
   mirror = !mirror;
-  document.querySelectorAll("button")[2].innerText = `Mirror: ${mirror ? "ON" : "OFF"}`;
+  document.getElementById("mirrorBtn").innerText = `Mirror: ${mirror ? "ON" : "OFF"}`;
+  document.getElementById("mirror-status").innerText = `Mirror: ${mirror ? "ON" : "OFF"}`;
 }
 
 function draw() {
@@ -116,72 +257,217 @@ function draw() {
 
   for (let y = 0; y < rows; y++) {
     for (let x = 0; x < cols; x++) {
-      ctx.fillStyle = grid[y][x] ? "#fff" : "#000";
+      ctx.fillStyle = grid[y][x] ? varColor("--accent-color", "#00f2ff") : "#000";
       ctx.fillRect(x * pixelSize, y * pixelSize, pixelSize, pixelSize);
-
-      ctx.strokeStyle = "#333";
+      ctx.strokeStyle = "#1a1d2e";
       ctx.strokeRect(x * pixelSize, y * pixelSize, pixelSize, pixelSize);
     }
   }
 }
 
-canvas.addEventListener("mousedown", startDraw);
-canvas.addEventListener("mousemove", e => {
-  if (e.buttons === 1) drawPixel(e);
-});
+function varColor(name, fallback) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
+}
 
-function startDraw(e) {
+let isDrawing = false;
+
+canvas.addEventListener("mousedown", (e) => {
+  e.preventDefault();
+  isDrawing = true;
   saveState();
   drawPixel(e);
+});
+
+window.addEventListener("mouseup", () => { isDrawing = false; });
+canvas.addEventListener("mouseleave", () => { isDrawing = false; });
+
+canvas.addEventListener("mousemove", (e) => {
+  updateCoords(e);
+  if (isDrawing) drawPixel(e);
+});
+
+function updateCoords(e) {
+  const rect = canvas.getBoundingClientRect();
+  const x = Math.floor((e.clientX - rect.left) / (rect.width / cols));
+  const y = Math.floor((e.clientY - rect.top) / (rect.height / rows));
+  
+  if (x >= 0 && x < cols && y >= 0 && y < rows) {
+    document.getElementById("coords").innerText = `X: ${x} | Y: ${y}`;
+  }
 }
 
 function drawPixel(e) {
   const rect = canvas.getBoundingClientRect();
-  const x = Math.floor((e.clientX - rect.left) / pixelSize);
-  const y = Math.floor((e.clientY - rect.top) / pixelSize);
+  const x = Math.floor((e.clientX - rect.left) / (rect.width / cols));
+  const y = Math.floor((e.clientY - rect.top) / (rect.height / rows));
 
-  if (x >= 0 && x < cols && y >= 0 && y < rows) {
-    grid[y][x] = tool;
+  if (x < 0 || x >= cols || y < 0 || y >= rows) return;
 
-    if (mirror) {
-      const mx = cols - 1 - x;
-      grid[y][mx] = tool;
+  grid[y][x] = tool;
+
+  if (mirror) {
+    const mx = cols - 1 - x;
+    grid[y][mx] = tool;
+  }
+
+  draw();
+}
+
+function exportData() {
+  document.getElementById("output").value = grid.map(r => `"${r.join("")}"`).join(",\n");
+}
+
+function processBytes(mode) {
+  const scanMode = document.getElementById("scan-mode").value;
+  const byteDir = document.getElementById("byte-dir").value;
+  const endian = document.getElementById("endian").value;
+
+  if (mode === 'export') {
+    let bytes = [];
+    if (scanMode === 'col') {
+      for (let x = 0; x < cols; x++) {
+        if (byteDir === 'vert') {
+          for (let y = 0; y < rows; y += 8) {
+            let byte = 0;
+            for (let bit = 0; bit < 8; bit++) {
+              if (y + bit < rows && grid[y + bit][x]) {
+                byte |= (endian === 'le' ? (1 << bit) : (1 << (7 - bit)));
+              }
+            }
+            bytes.push(byte);
+          }
+        } else { // horz (8x1) in column scan? Unusual but possible
+          for (let y = 0; y < rows; y++) {
+             // In column scan, horz byte doesn't make much sense unless it wraps columns?
+             // Usually it's either Column-Vertical or Row-Horizontal.
+             // We'll treat it as 8 bits along the scan direction.
+             // But for now, let's stick to common LCD formats.
+          }
+        }
+      }
+    } else { // row scan
+      for (let y = 0; y < rows; y++) {
+        if (byteDir === 'horz') {
+          for (let x = 0; x < cols; x += 8) {
+            let byte = 0;
+            for (let bit = 0; bit < 8; bit++) {
+              if (x + bit < cols && grid[y][x + bit]) {
+                byte |= (endian === 'le' ? (1 << bit) : (1 << (7 - bit)));
+              }
+            }
+            bytes.push(byte);
+          }
+        } else { // vert (1x8) in row scan
+           // Similar to above, unusual.
+        }
+      }
     }
+    document.getElementById("output").value = bytes.map(b => `0x${b.toString(16).toUpperCase().padStart(2, '0')}`).join(", ");
+  } else {
+    // Import
+    saveState();
+    let text = document.getElementById("output").value;
+    let bytes = text.match(/0x[0-9A-Fa-f]{2}|[0-9A-Fa-f]{2}/g);
+    if (!bytes) return alert("No bytes found in 0xFF or FF format");
+    bytes = bytes.map(b => parseInt(b.startsWith('0x') ? b : '0x' + b, 16));
 
+    let byteIdx = 0;
+    grid = createEmptyGrid();
+
+    if (scanMode === 'col') {
+      for (let x = 0; x < cols; x++) {
+        for (let y = 0; y < rows; y += 8) {
+          if (byteIdx >= bytes.length) break;
+          let byte = bytes[byteIdx++];
+          for (let bit = 0; bit < 8; bit++) {
+            if (y + bit < rows) {
+              let val = (endian === 'le' ? (byte & (1 << bit)) : (byte & (1 << (7 - bit))));
+              grid[y + bit][x] = val ? 1 : 0;
+            }
+          }
+        }
+      }
+    } else {
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x += 8) {
+          if (byteIdx >= bytes.length) break;
+          let byte = bytes[byteIdx++];
+          for (let bit = 0; bit < 8; bit++) {
+            if (x + bit < cols) {
+              let val = (endian === 'le' ? (byte & (1 << bit)) : (byte & (1 << (7 - bit))));
+              grid[y][x + bit] = val ? 1 : 0;
+            }
+          }
+        }
+      }
+    }
     draw();
   }
 }
 
-function exportData() {
-  let result = grid.map(row => `"${row.join("")}"`).join(",\n");
-  document.getElementById("output").value = result;
+function exportBMP() {
+  const width = cols;
+  const height = rows;
+  const rowSize = Math.ceil((width * 3) / 4) * 4;
+  const pixelArraySize = rowSize * height;
+  const headerSize = 14 + 40;
+  const fileSize = headerSize + pixelArraySize;
+
+  const buffer = new ArrayBuffer(fileSize);
+  const view = new DataView(buffer);
+
+  let offset = 0;
+  view.setUint8(offset++, 0x42); // B
+  view.setUint8(offset++, 0x4D); // M
+  view.setUint32(offset, fileSize, true); offset += 4;
+  view.setUint32(offset, 0, true); offset += 4;
+  view.setUint32(offset, headerSize, true); offset += 4;
+
+  view.setUint32(offset, 40, true); offset += 4;
+  view.setInt32(offset, width, true); offset += 4;
+  view.setInt32(offset, height, true); offset += 4;
+  view.setUint16(offset, 1, true); offset += 2;
+  view.setUint16(offset, 24, true); offset += 2;
+  view.setUint32(offset, 0, true); offset += 4;
+  view.setUint32(offset, pixelArraySize, true); offset += 4;
+  view.setInt32(offset, 2835, true); offset += 4;
+  view.setInt32(offset, 2835, true); offset += 4;
+  view.setUint32(offset, 0, true); offset += 4;
+  view.setUint32(offset, 0, true); offset += 4;
+
+  for (let y = height - 1; y >= 0; y--) {
+    let rowOffset = offset;
+    for (let x = 0; x < width; x++) {
+      const val = grid[y][x] ? 255 : 0;
+      view.setUint8(offset++, val); // B
+      view.setUint8(offset++, val); // G
+      view.setUint8(offset++, val); // R
+    }
+    while ((offset - rowOffset) % 4 !== 0) {
+      view.setUint8(offset++, 0);
+    }
+  }
+
+  const blob = new Blob([buffer], { type: "image/bmp" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `sprite_${width}x${height}.bmp`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
 function importData() {
   saveState();
-
   let text = document.getElementById("output").value;
   let lines = text.match(/"([01]+)"/g);
-
-  if (!lines) return alert("Formato inválido");
-
+  if (!lines) return alert("Invalid format (use quoted strings with 0s and 1s)");
   lines = lines.map(l => l.replace(/"/g, ""));
-
-  if (lines.length !== rows) {
-    alert("Quantidade de linhas incorreta");
-    return;
-  }
-
-  for (let y = 0; y < rows; y++) {
-    if (lines[y].length !== cols) {
-      alert(`Linha ${y} com tamanho errado`);
-      return;
-    }
-    for (let x = 0; x < cols; x++) {
+  for (let y = 0; y < Math.min(rows, lines.length); y++)
+    for (let x = 0; x < Math.min(cols, lines[y].length); x++)
       grid[y][x] = Number(lines[y][x]);
-    }
-  }
-
   draw();
 }
 
@@ -191,13 +477,7 @@ function clearGrid() {
   draw();
 }
 
-function invertTextarea() {
-  let text = document.getElementById("output").value;
-  if (!text) return;
-  text = text.replace(/[01]/g, b => (b === "0" ? "1" : "0"));
-  document.getElementById("output").value = text;
-}
-
+try { draw(); } catch (e) { console.error("Draw failed", e); }
 </script>
 
 </body>
