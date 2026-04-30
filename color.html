@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<title>Color Editor 32x16</title>
+<style>
+  :root {
+    --bg-color: #0f111a;
+    --card-bg: #1a1d2e;
+    --accent-color: #00f2ff;
+    --text-color: #e6edf3;
+    --button-bg: #2d334a;
+    --button-hover: #3d4465;
+    --input-bg: #0d1117;
+  }
+
+  body { 
+    background: var(--bg-color); 
+    color: var(--text-color); 
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+    margin: 0;
+  }
+
+  .container {
+    background: var(--card-bg);
+    padding: 30px;
+    border-radius: 16px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    max-width: 900px;
+    width: 100%;
+  }
+
+  h2 { margin-top: 0; color: var(--accent-color); font-weight: 300; letter-spacing: 2px; text-align: center; }
+
+  .nav-link {
+    display: block;
+    text-align: center;
+    margin-bottom: 20px;
+    color: var(--accent-color);
+    text-decoration: none;
+    font-size: 14px;
+  }
+  .nav-link:hover { text-decoration: underline; }
+
+  .editor-layout {
+    display: flex;
+    gap: 30px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .canvas-container {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    border: 2px solid #333;
+    border-radius: 4px;
+    overflow: hidden;
+    width: fit-content;
+    height: fit-content;
+  }
+
+  canvas { 
+    display: block;
+    image-rendering: pixelated; 
+    cursor: crosshair; 
+    background: transparent;
+  }
+  
+  .canvas-bg {
+    background: repeating-conic-gradient(#333 0% 25%, #222 0% 50%) 50% / 20px 20px;
+  }
+
+  .status-bar {
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(4px);
+    color: var(--accent-color);
+    font-family: monospace;
+    font-size: 12px;
+    padding: 6px 10px;
+    display: flex;
+    justify-content: space-between;
+    border-top: 1px solid #333;
+  }
+
+  .side-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    width: 250px;
+  }
+
+  .palette-container {
+    background: var(--input-bg);
+    padding: 15px;
+    border-radius: 8px;
+    border: 1px solid #333;
+  }
+
+  .palette-container h3 {
+    margin: 0 0 10px 0;
+    font-size: 14px;
+    color: #8b949e;
+    text-transform: uppercase;
+  }
+
+  .palette {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    gap: 4px;
+  }
+
+  .color-swatch {
+    width: 100%;
+    aspect-ratio: 1;
+    border: 1px solid #444;
+    cursor: pointer;
+    border-radius: 3px;
+    box-sizing: border-box;
+    position: relative;
+  }
+
+  .color-swatch.selected {
+    border: 2px solid white;
+    z-index: 2;
+    transform: scale(1.15);
+    box-shadow: 0 0 5px rgba(0,0,0,0.8);
+  }
+
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .config-panel {
+    background: var(--input-bg);
+    padding: 15px;
+    border-radius: 8px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    border: 1px solid #333;
+  }
+
+  .config-group {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 5px;
+    flex: 1;
+    min-width: 100px;
+  }
+
+  .config-group label {
+    font-size: 11px;
+    color: #8b949e;
+    text-transform: uppercase;
+    font-weight: bold;
+  }
+
+  select, button, input[type="color"] {
+    background: var(--button-bg);
+    color: white;
+    border: 1px solid #444;
+    padding: 8px 15px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    transition: all 0.2s;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  
+  input[type="color"] {
+    padding: 0;
+    height: 35px;
+  }
+
+  button:hover { background: var(--button-hover); border-color: var(--accent-color); }
+  button.active { background: var(--accent-color); color: black; border-color: var(--accent-color); }
+  button.action-btn { width: auto; }
+
+  textarea { 
+    width: 100%; 
+    height: 120px; 
+    background: var(--input-bg); 
+    color: #58a6ff; 
+    font-family: 'Cascadia Code', 'Fira Code', monospace; 
+    border: 1px solid #333;
+    border-radius: 8px;
+    padding: 10px;
+    box-sizing: border-box;
+    resize: vertical;
+    margin-top: 20px;
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <h2>COLOR EDITOR 32x16</h2>
+  <a href="index.html" class="nav-link">&larr; Switch to Binary Mode</a>
+
+  <div class="editor-layout">
+    <div class="canvas-container canvas-bg">
+      <canvas id="canvas"></canvas>
+      <div class="status-bar">
+        <span id="coords">X: 0 | Y: 0</span>
+        <span id="mirror-status">Mirror: OFF</span>
+      </div>
+    </div>
+
+    <div class="side-panel">
+      <div class="palette-container">
+        <h3>Palette (32 Colors)</h3>
+        <div class="palette" id="palette"></div>
+        <div class="config-group" style="margin-top: 10px;">
+          <label>Edit Selected Color</label>
+          <input type="color" id="color-picker" value="#000000">
+        </div>
+      </div>
+
+      <div class="controls">
+        <button onclick="setTool('pencil')" id="btn-pencil" class="active">Pencil</button>
+        <button onclick="setTool('eraser')" id="btn-eraser">Eraser</button>
+        <button onclick="setTool('fill')" id="btn-fill">Fill</button>
+      </div>
+
+      <div class="controls">
+        <button onclick="toggleMirror()" id="mirrorBtn">Mirror: OFF</button>
+        <button onclick="undo()">Undo</button>
+        <button onclick="redo()">Redo</button>
+        <button onclick="clearGrid()">Clear</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="config-panel" style="margin-top: 20px;">
+    <div class="config-group">
+      <label>Export Format</label>
+      <select id="export-format">
+        <option value="uint32">32-bit ARGB (0xAARRGGBB)</option>
+        <option value="uint16">RGB565 (uint16_t) 0xRRRRGGGGBBBBB</option>
+        <option value="rgb24">24-bit RGB (0xRRGGBB)</option>
+        <option value="indices" selected>Palette Indices (uint8_t)</option>
+      </select>
+    </div>
+    <div class="config-group">
+      <label>Include Palette Array?</label>
+      <select id="export-palette">
+        <option value="yes">Yes</option>
+        <option value="no">No</option>
+      </select>
+    </div>
+    <div class="config-group" style="flex: 2; display: flex; flex-direction: row; align-items: flex-end; gap: 10px;">
+      <button onclick="exportData()" style="background: #238636;">Export Embedded Code</button>
+      <button onclick="importData()" style="background: #1f6feb;">Import Embedded Code</button>
+      <button onclick="importBinary()" style="background: #d73a49;">Import Binary Mask</button>
+    </div>
+  </div>
+
+  <textarea id="output" placeholder="Embedded code (C array) output/input here..."></textarea>
+</div>
+
+<script>
+const cols = 32;
+const rows = 16;
+const pixelSize = 15;
+
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+
+canvas.width = cols * pixelSize;
+canvas.height = rows * pixelSize;
+
+// Default 32-color palette (Pico-8 inspired + extras)
+let palette = [
+  "#000000", "#1D2B53", "#7E2553", "#008751", "#AB5236", "#5F574F", "#C2C3C7", "#FFF1E8",
+  "#FF004D", "#FFA300", "#FFEC27", "#00E436", "#29ADFF", "#83769C", "#FF77A8", "#FFCCAA",
+  "#291814", "#111D35", "#422136", "#125359", "#742F29", "#493C2B", "#A28879", "#F3EF7D",
+  "#BE1250", "#FF6C24", "#A8E72E", "#00B543", "#065AB5", "#754665", "#FF6E59", "#FF9D81"
+];
+
+let selectedColorIdx = 1; // start with color 1
+let grid = createEmptyGrid();
+let tool = 'pencil';
+let mirror = false;
+let history = [];
+let redoStack = [];
+
+function createEmptyGrid() {
+  return Array.from({ length: rows }, () => Array(cols).fill(-1)); // -1 means empty/transparent
+}
+
+// Initialize palette UI
+const paletteContainer = document.getElementById("palette");
+const colorPicker = document.getElementById("color-picker");
+
+function renderPalette() {
+  paletteContainer.innerHTML = '';
+  palette.forEach((color, idx) => {
+    const swatch = document.createElement("div");
+    swatch.className = "color-swatch" + (idx === selectedColorIdx ? " selected" : "");
+    swatch.style.backgroundColor = color;
+    swatch.onclick = () => selectColor(idx);
+    paletteContainer.appendChild(swatch);
+  });
+}
+
+function selectColor(idx) {
+  selectedColorIdx = idx;
+  renderPalette();
+  colorPicker.value = palette[idx];
+}
+
+colorPicker.addEventListener('input', (e) => {
+  palette[selectedColorIdx] = e.target.value;
+  renderPalette();
+  draw(); // redraw canvas with updated palette
+});
+
+renderPalette();
+selectColor(1);
+
+function saveState() {
+  history.push(JSON.stringify(grid));
+  if (history.length > 100) history.shift();
+  redoStack = [];
+}
+
+function undo() {
+  if (!history.length) return;
+  redoStack.push(JSON.stringify(grid));
+  grid = JSON.parse(history.pop());
+  draw();
+}
+
+function redo() {
+  if (!redoStack.length) return;
+  history.push(JSON.stringify(grid));
+  grid = JSON.parse(redoStack.pop());
+  draw();
+}
+
+function setTool(t) { 
+  tool = t; 
+  document.getElementById("btn-pencil").classList.toggle("active", tool === 'pencil');
+  document.getElementById("btn-eraser").classList.toggle("active", tool === 'eraser');
+  document.getElementById("btn-fill").classList.toggle("active", tool === 'fill');
+}
+
+function toggleMirror() {
+  mirror = !mirror;
+  document.getElementById("mirrorBtn").innerText = `Mirror: ${mirror ? "ON" : "OFF"}`;
+  document.getElementById("mirror-status").innerText = `Mirror: ${mirror ? "ON" : "OFF"}`;
+}
+
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  for (let y = 0; y < rows; y++) {
+    for (let x = 0; x < cols; x++) {
+      let colorIdx = grid[y][x];
+      if (colorIdx !== -1) {
+        ctx.fillStyle = palette[colorIdx];
+        ctx.fillRect(x * pixelSize, y * pixelSize, pixelSize, pixelSize);
+      }
+      ctx.strokeStyle = "rgba(255,255,255,0.05)";
+      ctx.strokeRect(x * pixelSize, y * pixelSize, pixelSize, pixelSize);
+    }
+  }
+}
+
+let isDrawing = false;
+
+canvas.addEventListener("mousedown", (e) => {
+  e.preventDefault();
+  saveState();
+  if (tool === 'fill') {
+    const rect = canvas.getBoundingClientRect();
+    const x = Math.floor((e.clientX - rect.left) / (rect.width / cols));
+    const y = Math.floor((e.clientY - rect.top) / (rect.height / rows));
+    fill(x, y, grid[y][x], selectedColorIdx);
+    draw();
+  } else {
+    isDrawing = true;
+    drawPixel(e);
+  }
+});
+
+window.addEventListener("mouseup", () => { isDrawing = false; });
+canvas.addEventListener("mouseleave", () => { isDrawing = false; });
+
+canvas.addEventListener("mousemove", (e) => {
+  updateCoords(e);
+  if (isDrawing) drawPixel(e);
+});
+
+function updateCoords(e) {
+  const rect = canvas.getBoundingClientRect();
+  const x = Math.floor((e.clientX - rect.left) / (rect.width / cols));
+  const y = Math.floor((e.clientY - rect.top) / (rect.height / rows));
+  
+  if (x >= 0 && x < cols && y >= 0 && y < rows) {
+    document.getElementById("coords").innerText = `X: ${x} | Y: ${y}`;
+  }
+}
+
+function drawPixel(e) {
+  const rect = canvas.getBoundingClientRect();
+  const x = Math.floor((e.clientX - rect.left) / (rect.width / cols));
+  const y = Math.floor((e.clientY - rect.top) / (rect.height / rows));
+
+  if (x < 0 || x >= cols || y < 0 || y >= rows) return;
+
+  const value = tool === 'eraser' ? -1 : selectedColorIdx;
+  grid[y][x] = value;
+
+  if (mirror) {
+    const mx = cols - 1 - x;
+    grid[y][mx] = value;
+  }
+
+  draw();
+}
+
+function fill(x, y, targetColor, replaceColor) {
+  if (targetColor === replaceColor) return;
+  if (x < 0 || x >= cols || y < 0 || y >= rows) return;
+  if (grid[y][x] !== targetColor) return;
+
+  let stack = [[x, y]];
+  while (stack.length > 0) {
+    let [cx, cy] = stack.pop();
+    if (grid[cy][cx] === targetColor) {
+      grid[cy][cx] = replaceColor;
+      if (mirror) grid[cy][cols - 1 - cx] = replaceColor;
+      if (cx > 0) stack.push([cx - 1, cy]);
+      if (cx < cols - 1) stack.push([cx + 1, cy]);
+      if (cy > 0) stack.push([cx, cy - 1]);
+      if (cy < rows - 1) stack.push([cx, cy + 1]);
+    }
+  }
+}
+
+function hexToRgb(hex) {
+  let r = 0, g = 0, b = 0;
+  if (hex.length === 7) {
+    r = parseInt(hex.substring(1, 3), 16);
+    g = parseInt(hex.substring(3, 5), 16);
+    b = parseInt(hex.substring(5, 7), 16);
+  }
+  return {r, g, b};
+}
+
+function hexToRGB565(hex) {
+  let {r, g, b} = hexToRgb(hex);
+  return ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3);
+}
+
+function exportData() {
+  const includePalette = document.getElementById("export-palette").value === 'yes';
+  let output = "";
+
+  // Export 4‑color palette as uint16_t RGB565
+  if (includePalette) {
+    output += `const uint16_t palette[4] = {\n  `;
+    const palVals = palette.slice(0,4).map(p => {
+      const c565 = hexToRGB565(p);
+      return `0x${c565.toString(16).toUpperCase().padStart(4, '0')}`;
+    });
+    output += palVals.join(', ') + `\n};\n\n`;
+  }
+
+  // Pack sprite pixels (2 bits each) into bytes
+  const totalPixels = rows * cols; // 512
+  const packedBytes = totalPixels / 4; // 128
+  output += `const uint8_t spritePacked[${packedBytes}] = {\n`;
+  const packed = [];
+  let byteVal = 0;
+  let count = 0;
+  for (let y = 0; y < rows; y++) {
+    for (let x = 0; x < cols; x++) {
+      let idx = grid[y][x];
+      // Map index to 0‑3 (wrap if more colors)
+      let val = idx === -1 ? 0 : (idx % 4);
+      byteVal = (byteVal << 2) | val;
+      count++;
+      if (count === 4) {
+        packed.push(`0x${byteVal.toString(16).toUpperCase().padStart(2, '0')}`);
+        count = 0;
+        byteVal = 0;
+      }
+    }
+  }
+  // Write packed values, 12 per line for readability
+  for (let i = 0; i < packed.length; i += 12) {
+    output += '  ' + packed.slice(i, i + 12).join(', ') + (i + 12 < packed.length ? ',\n' : '\n');
+  }
+  output += `};\n`;
+  document.getElementById("output").value = output;
+}
+
+function importData() {
+  const text = document.getElementById("output").value;
+  saveState();
+
+  // Try to extract palette
+  const palMatch = text.match(/palette\[32\]\s*=\s*{([^}]+)}/i);
+  if (palMatch) {
+    const palValues = palMatch[1].match(/0x[0-9A-Fa-f]+/g);
+    if (palValues) {
+      for (let i = 0; i < Math.min(32, palValues.length); i++) {
+        let hexStr = palValues[i].replace('0x', '');
+        if (hexStr.length >= 6) {
+          palette[i] = '#' + hexStr.slice(-6);
+        }
+      }
+      renderPalette();
+    }
+  }
+
+  // Try to extract sprite data
+  const dataMatch = text.match(/spriteData\[\d+\]\s*=\s*{([^}]+)}/i) || text.match(/{\s*(0x[0-9A-Fa-f]+[\s\S]*)}/i);
+  if (dataMatch) {
+    const values = dataMatch[1].match(/0x[0-9A-Fa-f]+/g);
+    if (values) {
+      let format = document.getElementById("export-format").value;
+      let i = 0;
+      grid = createEmptyGrid();
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          if (i < values.length) {
+            let val = parseInt(values[i++], 16);
+            if (format === 'indices') {
+              grid[y][x] = val >= 0 && val < 32 ? val : -1;
+            } else if (format === 'uint16') {
+              // Extremely basic matching - we just find the closest color in palette
+              grid[y][x] = findClosestColorInPalette16(val);
+            } else {
+              grid[y][x] = findClosestColorInPalette32(val);
+            }
+          }
+        }
+      }
+      draw();
+      return;
+    }
+  }
+  alert("Could not parse valid array format from input.");
+}
+
+// New: Import a binary mask (multiple lines of 0/1)
+function importBinary() {
+  const text = document.getElementById("output").value.trim();
+  if (!text) return alert("No binary data found.");
+  const lines = text.split(/\r?\n/).filter(l => l.length > 0);
+  saveState();
+  for (let y = 0; y < Math.min(rows, lines.length); y++) {
+    const line = lines[y].trim();
+    for (let x = 0; x < Math.min(cols, line.length); x++) {
+      if (line[x] === '1') {
+        grid[y][x] = selectedColorIdx;
+        if (mirror) grid[y][cols - 1 - x] = selectedColorIdx;
+      }
+    }
+  }
+  draw();
+}
+
+function findClosestColorInPalette16(val565) {
+  let r1 = ((val565 >> 11) & 0x1F) << 3;
+  let g1 = ((val565 >> 5) & 0x3F) << 2;
+  let b1 = (val565 & 0x1F) << 3;
+  return findClosest(r1, g1, b1);
+}
+
+function findClosestColorInPalette32(val) {
+  let hex = val.toString(16).padStart(6, '0');
+  let r1 = parseInt(hex.slice(-6, -4), 16) || 0;
+  let g1 = parseInt(hex.slice(-4, -2), 16) || 0;
+  let b1 = parseInt(hex.slice(-2), 16) || 0;
+  return findClosest(r1, g1, b1);
+}
+
+function findClosest(r1, g1, b1) {
+  if (r1 === 0 && g1 === 0 && b1 === 0) return -1; // Assuming 0 is transparent/empty or index 0
+  let minDist = Infinity;
+  let minIdx = 0;
+  for (let i = 0; i < 32; i++) {
+    let {r, g, b} = hexToRgb(palette[i]);
+    let dist = (r-r1)*(r-r1) + (g-g1)*(g-g1) + (b-b1)*(b-b1);
+    if (dist < minDist) {
+      minDist = dist;
+      minIdx = i;
+    }
+  }
+  return minIdx;
+}
+
+function clearGrid() {
+  saveState();
+  grid = createEmptyGrid();
+  draw();
+}
+
+try { draw(); } catch (e) { console.error("Draw failed", e); }
+</script>
+
+</body>
+</html>
