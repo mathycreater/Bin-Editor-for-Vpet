@@ -73,7 +73,7 @@
   }
   
   .canvas-bg {
-    background: repeating-conic-gradient(#333 0% 25%, #222 0% 50%) 50% / 20px 20px;
+    background: repeating-conic-gradient(#555 0% 25%, #333 0% 50%) 50% / 20px 20px;
   }
 
   .status-bar {
@@ -230,6 +230,7 @@
         <button onclick="setTool('pencil')" id="btn-pencil" class="active">Pencil</button>
         <button onclick="setTool('eraser')" id="btn-eraser">Eraser</button>
         <button onclick="setTool('fill')" id="btn-fill">Fill</button>
+        <button onclick="setTool('fill-eraser')" id="btn-fill-eraser">Eraser Fill</button>
       </div>
 
       <div class="controls">
@@ -349,11 +350,11 @@ function redo() {
   draw();
 }
 
-function setTool(t) { 
-  tool = t; 
-  document.getElementById("btn-pencil").classList.toggle("active", tool === 'pencil');
-  document.getElementById("btn-eraser").classList.toggle("active", tool === 'eraser');
-  document.getElementById("btn-fill").classList.toggle("active", tool === 'fill');
+function setTool(t) {
+  tool = t;
+  document.querySelectorAll('.controls button').forEach(btn => btn.classList.remove('active'));
+  const btn = document.getElementById(`btn-${t}`);
+  if (btn) btn.classList.add('active');
 }
 
 function toggleMirror() {
@@ -383,11 +384,12 @@ let isDrawing = false;
 canvas.addEventListener("mousedown", (e) => {
   e.preventDefault();
   saveState();
-  if (tool === 'fill') {
+  if (tool === 'fill' || tool === 'fill-eraser') {
     const rect = canvas.getBoundingClientRect();
     const x = Math.floor((e.clientX - rect.left) / (rect.width / cols));
     const y = Math.floor((e.clientY - rect.top) / (rect.height / rows));
-    fill(x, y, grid[y][x], selectedColorIdx);
+    const replaceColor = tool === 'fill' ? selectedColorIdx : -1;
+    fill(x, y, grid[y][x], replaceColor);
     draw();
   } else {
     isDrawing = true;
