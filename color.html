@@ -249,6 +249,7 @@
         <option value="uint16">RGB565 (uint16_t) 0xRRRRGGGGBBBBB</option>
         <option value="rgb24">24-bit RGB (0xRRGGBB)</option>
         <option value="indices" selected>Palette Indices (uint8_t)</option>
+        <option value="packed">Packed 2-bit (uint8_t[128])</option>
       </select>
     </div>
     <div class="config-group">
@@ -464,46 +465,100 @@ function hexToRGB565(hex) {
   return ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3);
 }
 
+function rgb565ToHex(val565) {
+  let r = ((val565 >> 11) & 0x1F) << 3;
+  let g = ((val565 >> 5) & 0x3F) << 2;
+  let b = (val565 & 0x1F) << 3;
+  return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1).toUpperCase();
+}
+
 function exportData() {
+  const format = document.getElementById("export-format").value;
   const includePalette = document.getElementById("export-palette").value === 'yes';
   let output = "";
 
-  // Export 4‑color palette as uint16_t RGB565
+  // Determine max used index
+  let maxIdx = 0;
+  for (let y = 0; y < rows; y++) {
+    for (let x = 0; x < cols; x++) {
+      if (grid[y][x] > maxIdx) maxIdx = grid[y][x];
+    }
+  }
+  const palSize = maxIdx + 1;
+
   if (includePalette) {
-    output += `const uint16_t palette[4] = {\n  `;
-    const palVals = palette.slice(0,4).map(p => {
+    output += `const uint16_t palette[${palSize}] = {\n  `;
+    const palVals = palette.slice(0, palSize).map(p => {
       const c565 = hexToRGB565(p);
       return `0x${c565.toString(16).toUpperCase().padStart(4, '0')}`;
     });
-    output += palVals.join(', ') + `\n};\n\n`;
+    for (let i = 0; i < palVals.length; i += 8) {
+      output += palVals.slice(i, i + 8).join(', ') + (i + 8 < palVals.length ? ',\n  ' : '');
+    }
+    output += `\n};\n\n`;
   }
 
-  // Pack sprite pixels (2 bits each) into bytes
-  const totalPixels = rows * cols; // 512
-  const packedBytes = totalPixels / 4; // 128
-  output += `const uint8_t spritePacked[${packedBytes}] = {\n`;
-  const packed = [];
-  let byteVal = 0;
-  let count = 0;
-  for (let y = 0; y < rows; y++) {
-    for (let x = 0; x < cols; x++) {
-      let idx = grid[y][x];
-      // Map index to 0‑3 (wrap if more colors)
-      let val = idx === -1 ? 0 : (idx % 4);
-      byteVal = (byteVal << 2) | val;
-      count++;
-      if (count === 4) {
-        packed.push(`0x${byteVal.toString(16).toUpperCase().padStart(2, '0')}`);
-        count = 0;
-        byteVal = 0;
+  if (format === 'indices') {
+    output += `const uint8_t spriteData[${rows * cols}] = {\n`;
+    const vals = [];
+    for (let y = 0; y < rows; y++) {
+      for (let x = 0; x < cols; x++) {
+        let idx = grid[y][x];
+        vals.push(idx === -1 ? "0" : idx.toString());
       }
     }
+    for (let i = 0; i < vals.length; i += 16) {
+      output += '  ' + vals.slice(i, i + 16).join(', ') + (i + 16 < vals.length ? ',\n' : '\n');
+    }
+    output += `};\n`;
+  } else if (format === 'packed') {
+    const totalPixels = rows * cols; // 512
+    const packedBytes = totalPixels / 4; // 128
+    output += `const uint8_t spritePacked[${packedBytes}] = {\n`;
+    const packed = [];
+    let byteVal = 0;
+    let count = 0;
+    for (let y = 0; y < rows; y++) {
+      for (let x = 0; x < cols; x++) {
+        let idx = grid[y][x];
+        let val = idx === -1 ? 0 : (idx % 4);
+        byteVal = (byteVal << 2) | val;
+        count++;
+        if (count === 4) {
+          packed.push(`0x${byteVal.toString(16).toUpperCase().padStart(2, '0')}`);
+          count = 0;
+          byteVal = 0;
+        }
+      }
+    }
+    for (let i = 0; i < packed.length; i += 12) {
+      output += '  ' + packed.slice(i, i + 12).join(', ') + (i + 12 < packed.length ? ',\n' : '\n');
+    }
+    output += `};\n`;
+  } else {
+    const type = (format === 'uint16') ? 'uint16_t' : 'uint32_t';
+    output += `const ${type} spriteData[${rows * cols}] = {\n`;
+    const vals = [];
+    for (let y = 0; y < rows; y++) {
+      for (let x = 0; x < cols; x++) {
+        let idx = grid[y][x];
+        let hex = idx === -1 ? "#000000" : palette[idx];
+        if (format === 'uint16') {
+          let c565 = hexToRGB565(hex);
+          vals.push(`0x${c565.toString(16).toUpperCase().padStart(4, '0')}`);
+        } else if (format === 'rgb24') {
+          vals.push(`0x${hex.substring(1).toUpperCase()}`);
+        } else {
+          vals.push(`0xFF${hex.substring(1).toUpperCase()}`);
+        }
+      }
+    }
+    for (let i = 0; i < vals.length; i += 12) {
+      output += '  ' + vals.slice(i, i + 12).join(', ') + (i + 12 < vals.length ? ',\n' : '\n');
+    }
+    output += `};\n`;
   }
-  // Write packed values, 12 per line for readability
-  for (let i = 0; i < packed.length; i += 12) {
-    output += '  ' + packed.slice(i, i + 12).join(', ') + (i + 12 < packed.length ? ',\n' : '\n');
-  }
-  output += `};\n`;
+
   document.getElementById("output").value = output;
 }
 
@@ -512,41 +567,66 @@ function importData() {
   saveState();
 
   // Try to extract palette
-  const palMatch = text.match(/palette\[32\]\s*=\s*{([^}]+)}/i);
+  const palMatch = text.match(/palette\s*\[\s*(\d+)\s*\]\s*=\s*{([^}]+)}/i);
   if (palMatch) {
-    const palValues = palMatch[1].match(/0x[0-9A-Fa-f]+/g);
+    const size = parseInt(palMatch[1]);
+    const palValues = palMatch[2].match(/0x[0-9A-Fa-f]+/g);
     if (palValues) {
-      for (let i = 0; i < Math.min(32, palValues.length); i++) {
-        let hexStr = palValues[i].replace('0x', '');
-        if (hexStr.length >= 6) {
-          palette[i] = '#' + hexStr.slice(-6);
+      for (let i = 0; i < Math.min(size, palValues.length, 32); i++) {
+        let val = parseInt(palValues[i], 16);
+        if (text.includes('uint16_t')) {
+           palette[i] = rgb565ToHex(val);
+        } else {
+           let hexStr = palValues[i].replace('0x', '');
+           if (hexStr.length >= 6) {
+             palette[i] = '#' + hexStr.slice(-6);
+           }
         }
       }
       renderPalette();
     }
   }
 
-  // Try to extract sprite data
-  const dataMatch = text.match(/spriteData\[\d+\]\s*=\s*{([^}]+)}/i) || text.match(/{\s*(0x[0-9A-Fa-f]+[\s\S]*)}/i);
-  if (dataMatch) {
-    const values = dataMatch[1].match(/0x[0-9A-Fa-f]+/g);
-    if (values) {
-      let format = document.getElementById("export-format").value;
-      let i = 0;
+  // Try to extract packed data first
+  const packedMatch = text.match(/spritePacked\s*\[\s*\d+\s*\]\s*=\s*{([^}]+)}/i);
+  if (packedMatch) {
+    const packedVals = packedMatch[1].match(/0x[0-9A-Fa-f]+/g);
+    if (packedVals) {
       grid = createEmptyGrid();
-      for (let y = 0; y < rows; y++) {
-        for (let x = 0; x < cols; x++) {
-          if (i < values.length) {
-            let val = parseInt(values[i++], 16);
-            if (format === 'indices') {
-              grid[y][x] = val >= 0 && val < 32 ? val : -1;
-            } else if (format === 'uint16') {
-              // Extremely basic matching - we just find the closest color in palette
-              grid[y][x] = findClosestColorInPalette16(val);
-            } else {
-              grid[y][x] = findClosestColorInPalette32(val);
-            }
-          }
+      let idx = 0;
+      for (let i = 0; i < packedVals.length; i++) {
+        let byteVal = parseInt(packedVals[i], 16);
+        for (let bit = 3; bit >= 0; bit--) {
+          let val = (byteVal >> (bit * 2)) & 0x03;
+          let y = Math.floor(idx / cols);
+          let x = idx % cols;
+          if (idx < rows * cols) grid[y][x] = val;
+          idx++;
+        }
+      }
+      draw();
+      return;
+    }
+  }
+
+  // Try to extract sprite data
+  const dataMatch = text.match(/spriteData\s*\[\s*\d+\s*\]\s*=\s*{([^}]+)}/i) || text.match(/{\s*([^}]+)}/i);
+  if (dataMatch) {
+    const values = dataMatch[1].match(/0x[0-9A-Fa-f]+|\b\d+\b/g);
+    if (values) {
+      grid = createEmptyGrid();
+      for (let i = 0; i < Math.min(values.length, rows * cols); i++) {
+        let y = Math.floor(i / cols);
+        let x = i % cols;
+        let valStr = values[i];
+        let val = parseInt(valStr, valStr.startsWith('0x') ? 16 : 10);
+        
+        if (val < 32 && !valStr.startsWith('0x')) {
+          grid[y][x] = val;
+        } else if (text.includes('uint16_t')) {
+          grid[y][x] = findClosestColorInPalette16(val);
+        } else {
+          grid[y][x] = findClosestColorInPalette32(val);
         }
       }
       draw();
