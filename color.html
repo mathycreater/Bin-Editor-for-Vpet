@@ -226,11 +226,18 @@
         </div>
       </div>
 
+      <div class="palette-container" id="ref-palette-container" style="margin-top: 10px; display: none;">
+        <h3>Reference Palette</h3>
+        <div class="palette" id="ref-palette"></div>
+        <p style="font-size: 10px; color: #8b949e; margin-top: 5px;">Click to copy to active slot</p>
+      </div>
+
       <div class="controls">
         <button onclick="setTool('pencil')" id="btn-pencil" class="active">Pencil</button>
         <button onclick="setTool('eraser')" id="btn-eraser">Eraser</button>
         <button onclick="setTool('fill')" id="btn-fill">Fill</button>
         <button onclick="setTool('fill-eraser')" id="btn-fill-eraser">Eraser Fill</button>
+        <button onclick="setTool('picker')" id="btn-picker">Picker</button>
       </div>
 
       <div class="controls">
@@ -289,6 +296,8 @@ let palette = [
   "#BE1250", "#FF6C24", "#A8E72E", "#00B543", "#065AB5", "#754665", "#FF6E59", "#FF9D81"
 ];
 
+let refPalette = [];
+
 let selectedColorIdx = 1; // start with color 1
 let grid = createEmptyGrid();
 let tool = 'pencil';
@@ -313,6 +322,29 @@ function renderPalette() {
     swatch.onclick = () => selectColor(idx);
     paletteContainer.appendChild(swatch);
   });
+}
+
+function renderRefPalette() {
+  const container = document.getElementById("ref-palette-container");
+  const div = document.getElementById("ref-palette");
+  div.innerHTML = "";
+  if (refPalette.length > 0) {
+    container.style.display = "block";
+    refPalette.forEach(color => {
+      const swatch = document.createElement("div");
+      swatch.className = "color-swatch";
+      swatch.style.background = color;
+      swatch.title = "Click to copy to selected slot";
+      swatch.onclick = () => {
+        palette[selectedColorIdx] = color;
+        renderPalette();
+        draw();
+      };
+      div.appendChild(swatch);
+    });
+  } else {
+    container.style.display = "none";
+  }
 }
 
 function selectColor(idx) {
@@ -383,6 +415,20 @@ let isDrawing = false;
 
 canvas.addEventListener("mousedown", (e) => {
   e.preventDefault();
+  if (tool === 'picker') {
+    const rect = canvas.getBoundingClientRect();
+    const x = Math.floor((e.clientX - rect.left) / (rect.width / cols));
+    const y = Math.floor((e.clientY - rect.top) / (rect.height / rows));
+    if (x >= 0 && x < cols && y >= 0 && y < rows) {
+      let idx = grid[y][x];
+      if (idx !== -1) {
+        palette[selectedColorIdx] = palette[idx];
+        renderPalette();
+        draw();
+      }
+    }
+    return;
+  }
   saveState();
   if (tool === 'fill' || tool === 'fill-eraser') {
     const rect = canvas.getBoundingClientRect();
@@ -587,18 +633,15 @@ function importData() {
     const size = parseInt(palMatch[1]);
     const palValues = palMatch[2].match(/0x[0-9A-Fa-f]+/g);
     if (palValues) {
+      refPalette = [];
       for (let i = 0; i < Math.min(size, palValues.length, 32); i++) {
         let val = parseInt(palValues[i], 16);
-        if (text.includes('uint16_t')) {
-           palette[i] = rgb565ToHex(val);
-        } else {
-           let hexStr = palValues[i].replace('0x', '');
-           if (hexStr.length >= 6) {
-             palette[i] = '#' + hexStr.slice(-6);
-           }
-        }
+        let hex = text.includes('uint16_t') ? rgb565ToHex(val) : ('#' + palValues[i].replace('0x', '').slice(-6));
+        palette[i] = hex;
+        if (i < 20) refPalette.push(hex);
       }
       renderPalette();
+      renderRefPalette();
     }
   }
 
