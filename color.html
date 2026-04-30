@@ -477,19 +477,31 @@ function exportData() {
   const includePalette = document.getElementById("export-palette").value === 'yes';
   let output = "";
 
-  // Determine max used index
-  let maxIdx = 0;
+  // 1. Identify used colors and create remapping
+  let usedIndices = new Set();
+  usedIndices.add(-1); // Always include transparent/bg as first entry (maps to 0)
   for (let y = 0; y < rows; y++) {
     for (let x = 0; x < cols; x++) {
-      if (grid[y][x] > maxIdx) maxIdx = grid[y][x];
+      if (grid[y][x] !== -1) usedIndices.add(grid[y][x]);
     }
   }
-  const palSize = maxIdx + 1;
+  
+  // Convert Set to array and maintain original palette order
+  let sortedUsed = Array.from(usedIndices).sort((a, b) => a - b);
+  
+  // Create mapping: Original Index -> New Compact Index
+  let mapping = new Map();
+  sortedUsed.forEach((origIdx, newIdx) => {
+    mapping.set(origIdx, newIdx);
+  });
+
+  const palSize = sortedUsed.length;
 
   if (includePalette) {
     output += `const uint16_t palette[${palSize}] = {\n  `;
-    const palVals = palette.slice(0, palSize).map(p => {
-      const c565 = hexToRGB565(p);
+    const palVals = sortedUsed.map(origIdx => {
+      let hex = (origIdx === -1) ? "#000000" : palette[origIdx];
+      const c565 = hexToRGB565(hex);
       return `0x${c565.toString(16).toUpperCase().padStart(4, '0')}`;
     });
     for (let i = 0; i < palVals.length; i += 8) {
@@ -503,8 +515,9 @@ function exportData() {
     const vals = [];
     for (let y = 0; y < rows; y++) {
       for (let x = 0; x < cols; x++) {
-        let idx = grid[y][x];
-        vals.push(idx === -1 ? "0" : idx.toString());
+        let origIdx = grid[y][x];
+        let newIdx = mapping.get(origIdx);
+        vals.push(newIdx.toString());
       }
     }
     for (let i = 0; i < vals.length; i += 16) {
@@ -512,16 +525,16 @@ function exportData() {
     }
     output += `};\n`;
   } else if (format === 'packed') {
-    const totalPixels = rows * cols; // 512
-    const packedBytes = totalPixels / 4; // 128
+    const totalPixels = rows * cols; 
+    const packedBytes = totalPixels / 4; 
     output += `const uint8_t spritePacked[${packedBytes}] = {\n`;
     const packed = [];
     let byteVal = 0;
     let count = 0;
     for (let y = 0; y < rows; y++) {
       for (let x = 0; x < cols; x++) {
-        let idx = grid[y][x];
-        let val = idx === -1 ? 0 : (idx % 4);
+        let origIdx = grid[y][x];
+        let val = mapping.get(origIdx) % 4; // Map to 2 bits
         byteVal = (byteVal << 2) | val;
         count++;
         if (count === 4) {
