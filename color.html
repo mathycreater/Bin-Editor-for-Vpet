@@ -73,7 +73,7 @@
   }
   
   .canvas-bg {
-    background: repeating-conic-gradient(#555 0% 25%, #333 0% 50%) 50% / 20px 20px;
+    background: repeating-conic-gradient(#2a2b36 0% 25%, #1f2029 0% 50%) 50% / 30px 30px;
   }
 
   .status-bar {
@@ -405,7 +405,7 @@ function draw() {
         ctx.fillStyle = palette[colorIdx];
         ctx.fillRect(x * pixelSize, y * pixelSize, pixelSize, pixelSize);
       }
-      ctx.strokeStyle = "rgba(255,255,255,0.05)";
+      ctx.strokeStyle = "rgba(255,255,255,0.15)";
       ctx.strokeRect(x * pixelSize, y * pixelSize, pixelSize, pixelSize);
     }
   }
@@ -658,7 +658,7 @@ function importData() {
           let val = (byteVal >> (bit * 2)) & 0x03;
           let y = Math.floor(idx / cols);
           let x = idx % cols;
-          if (idx < rows * cols) grid[y][x] = val;
+          if (idx < rows * cols) grid[y][x] = val === 0 ? -1 : val;
           idx++;
         }
       }
@@ -680,7 +680,7 @@ function importData() {
         let val = parseInt(valStr, valStr.startsWith('0x') ? 16 : 10);
         
         if (val < 32 && !valStr.startsWith('0x')) {
-          grid[y][x] = val;
+          grid[y][x] = val === 0 ? -1 : val;
         } else if (text.includes('uint16_t')) {
           grid[y][x] = findClosestColorInPalette16(val);
         } else {
@@ -704,8 +704,8 @@ function importBinary() {
     const line = lines[y].trim();
     for (let x = 0; x < Math.min(cols, line.length); x++) {
       if (line[x] === '1') {
-        grid[y][x] = selectedColorIdx;
-        if (mirror) grid[y][cols - 1 - x] = selectedColorIdx;
+        grid[y][x] = 0;
+        if (mirror) grid[y][cols - 1 - x] = 0;
       }
     }
   }
